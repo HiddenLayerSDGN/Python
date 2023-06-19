@@ -1,15 +1,16 @@
+import os
+path, download_path = os.environ.get('PATH'), os.environ.get('DOWNLOAD')
+
 class ImageAI:
     def save_img(self, DataBundle: object, Labeling_Dones: list) -> None:
-            import os, time
-            if not os.path.exists(f'{원하는 경로}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename}'):
-                os.makedirs(f'{원하는 경로}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename}')
-
+            import time
+            if not os.path.exists(f'{path}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename}'):
+                os.makedirs(f'{path}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename}')
             from urllib.request import urlretrieve
             try:
                 for i, v in enumerate(Labeling_Dones):
-                    url = f'{다운받을 경로}/{DataBundle.bundle_uploader}/{DataBundle.bundle_folder_name}/{v.data_no}'
-                    print(DataBundle.bundle_folder_name) # 이 부분 문제있는 거 같음
-                    filepath = f"{원하는 경로}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename}/{i + 1}.jpg"
+                    url = f'{download_path}/{DataBundle.bundle_uploader}/{DataBundle.bundle_folder_name}/{v.data_no}'
+                    filepath = f"{path}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename}/{i + 1}.jpg"
                     if os.path.exists(filepath):
                         continue
                     urlretrieve(url, filepath)
@@ -19,7 +20,7 @@ class ImageAI:
 
     def convert_to_num(self, DataBundle: object) -> list:
         import glob
-        files = glob.glob(f'{원하는 경로}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename}/*.jpg')
+        files = glob.glob(f'{path}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename}/*.jpg')
 
         from PIL import Image
         import numpy as np
@@ -75,7 +76,7 @@ class ImageAI:
         import numpy as np
         answers = [[i.label] for i in Labeling_Dones]
         (X_train, y_train) = (np.array(array[:len(array) * 80 / 100]), np.array(answers[:len(answers) * 80 / 100]))
-        (X_test, y_test) = (np.array(array[:len(array) * 20 / 100]), np.array(answers[:len(answers) * 20 / 100]))
+        (X_test, y_test) = (np.array(array[(len(array) * 80 / 100):]), np.array(answers[(len(array) * 80 / 100):]))
         # 이미지, 답
 
         X_train = X_train.astype('float32') / 255
