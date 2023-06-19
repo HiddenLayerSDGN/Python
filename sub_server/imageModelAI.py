@@ -1,26 +1,34 @@
+from dotenv import load_dotenv
 import os
-path, download_path = os.environ.get('PATH'), os.environ.get('DOWNLOAD')
+
+load_dotenv()
+folder, download_path = os.environ.get('FOLDER'), os.environ.get('DOWNLOAD')
 
 class ImageAI:
     def save_img(self, DataBundle: object, Labeling_Dones: list) -> None:
-            import time
-            if not os.path.exists(f'{path}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename}'):
-                os.makedirs(f'{path}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename}')
-            from urllib.request import urlretrieve
-            try:
-                for i, v in enumerate(Labeling_Dones):
-                    url = f'{download_path}/{DataBundle.bundle_uploader}/{DataBundle.bundle_folder_name}/{v.data_no}'
-                    filepath = f"{path}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename}/{i + 1}.jpg"
-                    if os.path.exists(filepath):
-                        continue
-                    urlretrieve(url, filepath)
-                    time.sleep(0.5)
-            except Exception as e:
-                print(e)
-
+        import time
+        from urllib.request import urlretrieve
+        from urllib.parse import quote
+        path = f'{folder}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename[:-4]}'
+        print(path)
+        if not os.path.exists(path):
+            os.makedirs(path)
+        try:
+            for i, v in enumerate(Labeling_Dones):
+                url = f'{download_path}/{DataBundle.bundle_uploader}/{quote(DataBundle.bundle_uploaded_filename[:-4])}/{v.data_no}'
+                filepath = path + f'/{v.data_no}.jpg'
+                print(DataBundle.bundle_uploaded_filename[:-4])
+                print(v.data_no)
+                if os.path.exists(filepath):
+                    continue
+                urlretrieve(url, filepath)
+                time.sleep(0.5)
+        except Exception as e:
+            print(e)
+            
     def convert_to_num(self, DataBundle: object) -> list:
         import glob
-        files = glob.glob(f'{path}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename}/*.jpg')
+        files = glob.glob(f'{folder}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename}/*.jpg')
 
         from PIL import Image
         import numpy as np
@@ -104,8 +112,8 @@ class ImageAI:
         model.fit(X_train, y_train, batch_size=120, epochs=5, validation_split=0.2)
 
         result = model.predict(X_test[0].reshape(-1, 32, 32, 3))[0]
-
-        labels = ['airplane', 'automobile', 'bird', 'cat', 'deer', 'dog', 'frog', 'horse', 'ship', 'truck']
+        
+        labels = list(set(answers))
         for i, acc in enumerate(result):
             print(labels[i], ':', round(acc * 100, 2), '%')
         print('예측결과', labels[result.argmax()])
