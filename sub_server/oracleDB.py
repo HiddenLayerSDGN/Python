@@ -1,10 +1,11 @@
 from cx_Oracle import connect
 
 class DataBundle:
-    def __init__(self, bundle_no: int, bundle_uploader: str, bundle_uploaded_filename: str, bundle_folder_name: str) -> None:
+    def __init__(self, bundle_no: int, bundle_uploader: str, bundle_uploaded_filename: str, bundle_data_type: str, bundle_folder_name: str) -> None:
         self.bundle_no = bundle_no # 이미지 url에 쓰임
         self.bundle_uploader = bundle_uploader # 이미지 저장 폴더 경로에 쓰일 예정 (사실 필수는 아니나, 내 마음임)
         self.bundle_uploaded_filename = bundle_uploaded_filename # 이미지 저장 폴더 경로에 쓰일 예정 (사실 필수는 아니나, 내 마음임)
+        self.bundle_data_type = bundle_data_type # jpg인지 png인지 구분
         self.bundle_folder_name = bundle_folder_name # 이미지 url에 쓰임
 
 class Labeling_Done:
@@ -29,7 +30,10 @@ class oracleDB:
         self.cur.execute(sql)
 
     def get_DataBundles(self) -> list:
-        return [DataBundle(bundle_no, bundle_uploader, bundle_uploaded_filename, bundle_folder_name) for bundle_no, bundle_uploader, bundle_uploaded_filename, bundle_folder_name in self.cur]
+        return [DataBundle(bundle_no, bundle_uploader, bundle_uploaded_filename, bundle_data_type, bundle_folder_name) for bundle_no, bundle_uploader, bundle_uploaded_filename, bundle_data_type, bundle_folder_name in self.cur]
 
     def get_Labeling_Done(self) -> list:
         return [Labeling_Done(data_no, worked_by, label) for data_no, worked_by, label in self.cur]
+    
+    def get_label_counts(self) -> int:
+        return self.cur.fetchone()

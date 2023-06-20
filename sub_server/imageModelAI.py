@@ -10,26 +10,26 @@ class ImageAI:
         from urllib.request import urlretrieve
         from urllib.parse import quote
         path = f'{folder}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename[:-4]}'
-        print(path)
         if not os.path.exists(path):
             os.makedirs(path)
         try:
             for i, v in enumerate(Labeling_Dones):
                 url = f'{download_path}/{DataBundle.bundle_uploader}/{quote(DataBundle.bundle_uploaded_filename[:-4])}/{v.data_no}'
-                filepath = path + f'/{v.data_no}.jpg'
-                print(DataBundle.bundle_uploaded_filename[:-4])
-                print(v.data_no)
+                filepath = path + f'/{v.data_no}'
+                print(url) # 디버깅 중
                 if os.path.exists(filepath):
                     continue
                 urlretrieve(url, filepath)
                 time.sleep(0.5)
+                if i == 0:
+                    break
         except Exception as e:
             print(e)
             
     def convert_to_num(self, DataBundle: object) -> list:
         import glob
-        files = glob.glob(f'{folder}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename}/*.jpg')
-
+        files = glob.glob(f'{folder}/{DataBundle.bundle_uploader}/{DataBundle.bundle_uploaded_filename[:-4]}/*.{DataBundle.bundle_data_type}')
+        
         from PIL import Image
         import numpy as np
         photo_size = 32
@@ -37,64 +37,28 @@ class ImageAI:
         for f in files:
             img = Image.open(f)
             img = img.convert('RGB')
-            img = img.resize(photo_size, photo_size) # 32 x 32로 바꿈
+            img = img.resize(size=(photo_size, photo_size)) # 32 x 32로 바꿈
             img = np.asarray(img) # 이미지를 3차원 배열로
             res.append(img) # 그걸 모아서, 학습에 사용할 것
         return res
 
-    def black_white(self):
-        import tensorflow as tf
-        (X_train, y_train), (X_test, y_test) = tf.keras.datasets.fashion_mnist.load_data() # 이 부분 바꾸고
-        
-        X_train = X_train.astype('float32') / 255
-        X_test = X_test.astype('float32') / 255
-
-        # 흑백이라
-        X_train = X_train.reshape(X_train.shape[0], 28, 28, 1)
-        X_test = X_test.reshape(X_test.shape[0], 28, 28, 1)
-
-        from tensorflow.keras.utils import to_categorical
-        y_train = to_categorical(y_train, 10)
-        y_test = to_categorical(y_test, 10)
-
-        from keras.models import Sequential
-        from keras import layers
-        model = Sequential()
-        model.add(layers.Conv2D(32, kernel_size=(3, 3), activation='relu', input_shape=(28, 28, 1)))
-        model.add(layers.MaxPooling2D(pool_size=(2, 2)))
-        model.add(layers.Conv2D(64, kernel_size=(3, 3), activation='relu'))
-        model.add(layers.MaxPooling2D(pool_size=(2, 2)))
-        model.add(layers.Flatten())
-        model.add(layers.Dropout(0.5))
-        model.add(layers.Dense(10, activation='softmax')) # x개
-
-        model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['acc'])
-        
-        model.fit(X_train, y_train, epochs=10, validation_split=0.2)
-        
-        model.evaluate(X_test, y_test)
-        
-        results = model.predict(X_test)
-
+    def color(self, array: list, Labeling_Dones: list, labels: list):
         import numpy as np
-        from sklearn.metrics import classification_report
-        print(classification_report(np.argmax(y_test, axis = -1), np.argmax(results, axis = -1)))
-
-    def color(self, array: list, Labeling_Dones: list):
-        import numpy as np
+        ai_thinks = []
         answers = [[i.label] for i in Labeling_Dones]
-        (X_train, y_train) = (np.array(array[:len(array) * 80 / 100]), np.array(answers[:len(answers) * 80 / 100]))
-        (X_test, y_test) = (np.array(array[(len(array) * 80 / 100):]), np.array(answers[(len(array) * 80 / 100):]))
+
         # 이미지, 답
+        (X_train, y_train) = (np.array(array[:len(array) * 80 // 100]), np.array(answers[:len(answers) * 80 // 100]))
+        (X_test, y_test) = (np.array(array[len(array) * 80 // 100:]), np.array(answers[len(answers) * 80 // 100:]))
 
         X_train = X_train.astype('float32') / 255
         X_test = X_test.astype('float32') / 255
 
-        from tensorflow.keras.utils import to_categorical
-        y_train = to_categorical(y_train, 10)
-        y_test = to_categorical(y_test, 10)
-
         import tensorflow as tf
+        from keras.utils import to_categorical
+        y_train = to_categorical(y_train, len(labels))
+        y_test = to_categorical(y_test, len(labels))
+
         from keras.layers import Dense
         model = tf.keras.Sequential([
         tf.keras.layers.Conv2D(32, kernel_size=(3, 3), padding='same', input_shape=(32, 32, 3), activation='relu'),
@@ -105,28 +69,37 @@ class ImageAI:
         Dense(32, activation='relu'),
         Dense(16, activation='relu'),
         tf.keras.layers.Dropout(0.5),
-        Dense(10, activation='softmax')])
+        Dense(len(labels), activation='softmax')])
 
         model.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['acc'])
 
         model.fit(X_train, y_train, batch_size=120, epochs=5, validation_split=0.2)
 
-        result = model.predict(X_test[0].reshape(-1, 32, 32, 3))[0]
+        result = model.predict(X_test)
         
-        labels = list(set(answers))
-        for i, acc in enumerate(result):
-            print(labels[i], ':', round(acc * 100, 2), '%')
-        print('예측결과', labels[result.argmax()])
-
-        for i, res in enumerate(y_test[0]):
-            if res > 0:
-                print('실제결과', labels[i])
-
+        predicts = {'예측결과': [], '실제결과': []}
+        for i in range(len(result)):
+            for j, acc in enumerate(result[i]):
+                print(f'{labels[j]} : {round(acc * 100, 2)} %')
+            print(f'예측결과 == {labels[result[i].argmax()]}')
+            predicts['예측결과'].append(labels[result[i].argmax()])
+            for j, res in enumerate(y_test[i]):
+                if res > 0:
+                    print(f'실제결과 == {labels[j]}')
+                    predicts['실제결과'].append(labels[j])
+        
         # 대충 이 쯤에서 정확도
-
-        return {'예측결과': labels[result.argmax()], '실제결과': labels[i]}
+        import pandas as pd
+        images = [i.data_no for i in Labeling_Dones]
+        labelers = [i.worked_by for i in Labeling_Dones]
+        df = pd.DataFrame([(a[-12:], b, c) for a, b, c in zip(images, labelers, sum(answers, []))])
+        # df.rename(columns=['image', 'labeler', 'answer'], inplace=True)
+        # df.reset_index(inplace=True, drop=True)
+        # df.set_index('image', inplace=True)
+        # df.sort_index()
+        return df
     
-    def accuracy(self, correct: list, submitted: list):
+    def accuracy(self, correct: list, submitted: list) -> list:
         res = []
         for _ in range(len(submitted)):
             res.append(sum([1 for a, b in zip(correct, submitted) if a == b]) / len(correct))
