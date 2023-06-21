@@ -35,5 +35,5 @@ class oracleDB:
     def get_Labeling_Done(self) -> list:
         return [Labeling_Done(data_no, worked_by, label) for data_no, worked_by, label in self.cur]
     
-    def get_label_counts(self) -> int:
+    def get_label_answers(self) -> int:
         return self.cur.fetchone()

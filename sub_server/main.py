@@ -19,10 +19,10 @@ def labeling(project_no: int) -> list:
     db.execute(sql)
     return db.get_Labeling_Done()
 
-def label_counts(project_no: int) -> int:
+def label_answers(project_no: int) -> int:
     sql = f"select project_category from Labeling_Project where project_no = {project_no} order by project_no"
     db.execute(sql)
-    return db.get_label_counts()
+    return db.get_label_answers()
 
 from fastapi.responses import FileResponse
 @app.get('/favicon.ico', include_in_schema=False)
@@ -31,17 +31,13 @@ async def favicon():
 
 @app.get("/{project_no}", status_code=200)
 def select(project_no: int) -> None:
-
     data_bundles = data(project_no)
     labeling_dones = labeling(project_no)
-    labels = json.loads(label_counts(project_no)[0])['info'] # str을 json으로 바꾸고 'info'로 접속 -> list가 return
-    print(data_bundles[0].bundle_uploaded_filename)
-    print(labeling_dones[0].data_no)
-    print(labels)
+    labels = json.loads(label_answers(project_no)[0])['info'] # str을 json으로 바꾸고 'info'로 접속 -> list가 return
     if not data_bundles or not labeling_dones:
         return {'no': 'data'}
     
     ai = ImageAI()
-    ai.save_img(data_bundles[0], labeling_dones)
-    array = ai.convert_to_num(data_bundles[0]) # 이미지를 3차원 배열로 변환
-    return ai.color(array, labeling_dones, labels)
+    array = ai.save_img(project_no, data_bundles[0], labeling_dones) # [image파일명, 작업자, 고른 답] 을 return
+    convert_images_3D = ai.convert_to_num(project_no, data_bundles[0]) # 이미지를 3차원 배열로 변환
+    return ai.color(project_no, array, convert_images_3D, labels)
