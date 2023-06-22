@@ -25,9 +25,9 @@ def select(project_no: int) -> None:
             return {'no': 'data'}
         
         ai = ImageAI()
-        array = ai.save_img(project_no, data_bundles[0], labeling_dones) # [image파일명, 작업자, 고른 답]을 return
+        (array, originals) = ai.save_img(project_no, data_bundles[0], labeling_dones) # [image파일명, 작업자, 고른 답]을 return
         convert_images_3D = ai.convert_to_num(project_no, data_bundles[0]) # 이미지를 3차원 배열로 변환
-        res = ai.color(project_no, array, convert_images_3D, labels)
+        res = ai.color(project_no, array, originals, convert_images_3D, labels)
         db.learning_end(project_no)
         return res
     except:

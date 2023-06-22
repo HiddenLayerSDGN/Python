@@ -66,9 +66,9 @@ class oracleDB:
     def get_label_names(self) -> list:
         return self.cur.fetchone()
     
-    def insert_result(self, project_no: int, images: list, answers: list) -> None:
-        for img, ans in zip(images, answers):
-            sql = f"insert into Labeling_Result values({project_no}, {img}, '{ans}')"
+    def insert_result(self, project_no: int, originals: list, answers: list) -> None:
+        for img_name, ans in zip(originals, answers):
+            sql = f"insert into Labeling_Result values({project_no}, '{img_name}', '{ans}')"
             self.execute(sql)
             self.con.commit()
 

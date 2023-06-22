@@ -27,18 +27,19 @@ class ImageAI:
         path = f'{folder}/{project_no}'
         if not os.path.exists(path):
             os.makedirs(path)
-        array = []
+        array, originals = [], []
         try:
             for v in Labeling_Dones:
                 url = f'{download_path}/{DataBundle.bundle_uploader}/{quote(DataBundle.bundle_uploaded_filename[:-4])}/{v.data_no}'
                 filepath = path + f'/{v.data_no}'
                 array.append([v.data_no[-12:-4], v.worked_by, v.label]) # image 번호, 작업자, 고른 답
+                originals.append(v.data_no)
                 if os.path.exists(filepath):
                     continue
                 urlretrieve(url, filepath)
         except Exception as e:
             print(e)
-        return array
+        return (array, originals)
                 
     def convert_to_num(self, project_no: int, DataBundle: object) -> list:
         files = glob.glob(f'{folder}/{project_no}/*.{DataBundle.bundle_data_type}')
@@ -52,7 +53,7 @@ class ImageAI:
             res.append(img) # 그걸 모아서, 학습에 사용할 것
         return res
 
-    def color(self, project_no: int, array: list, convert_images_3D: list, labels: list):
+    def color(self, project_no: int, array: list, originals: list, convert_images_3D: list, labels: list):
         print('작업 시작')
         df = pd.DataFrame(array)
         df.rename(columns={0: 'image', 1: 'labeler', 2: 'answer'}, inplace=True)
@@ -60,13 +61,14 @@ class ImageAI:
         if len(convert_images_3D) < len(array):
             images = list(map(lambda x: x[0], array[:len(convert_images_3D)])) # 사진 갯수만큼 가져온 것
             answers = [Counter(list(df[df['image'] == str(i)]['answer'].astype('int32'))).most_common(1)[0][0] for i in images] # 통계로 voting에 가깝게 구현함
+            originals = originals[:len(convert_images_3D)] # 사진 갯수만큼 가져온 것
             # 답이, 사진 갯수보다 적을 때는, 라벨링이 덜 된 것이니 그냥 원본그대로 가면 되고
             # 답이, 사진 갯수보다 많을 때는 사진 갯수만큼 가져와서 == 마지막 -> 처음 되기 직전 부분까지 가져와서 통계 
         else:
             images = list(df['image'])
             answers = list(df['answer'].astype('int32'))
 
-        db.insert_result(project_no, images, answers) # 정산하기 누르면 의뢰자에게 건네줄 데이터 db에 저장
+        db.insert_result(project_no, originals, answers) # 정산하기 누르면 의뢰자에게 건네줄 데이터 db에 저장
         
         # 이미지, 답
         X_train, X_test, y_train, y_test = train_test_split(convert_images_3D, answers, test_size=0.2, random_state=0) # 원본의 타입이 유지됨
