@@ -1,28 +1,29 @@
 from oracleDB import oracleDB
 from dotenv import load_dotenv
-import os
+import os, time, glob
+from urllib.request import urlretrieve
+from urllib.parse import quote
+from PIL import Image
+import numpy as np, pandas as pd, tensorflow as tf
+from sklearn.model_selection import train_test_split
+from keras.utils import to_categorical
+from keras.layers import Dense
+from collections import Counter, defaultdict
 
 load_dotenv()
 db = oracleDB(os.environ.get('ID'), os.environ.get('PW'), os.environ.get('IP'), os.environ.get('PORT'), os.environ.get('SID'))
 folder, download_path = os.environ.get('FOLDER'), os.environ.get('DOWNLOAD')
 
-def insert_result(project_no: int, images: list, answers: list) -> None:
-    for img, ans in zip(images, answers):
-        sql = f"insert into Labeling_Result values({project_no}, {img}, {ans})"
-        db.execute(sql)
-        db.con.commit()
-
-def insert_trust(trust: list, labeler: list) -> None:
-    for tru, ler in zip(trust, labeler):
-        sql = f"update Member set user_trust = {tru} where user_id = {ler}"
-        db.execute(sql)
-        db.con.commit()
+def calc_accuracy(df: list, images: list, answers: list) -> list:
+    worker_score = defaultdict(int)
+    checklist = {img_no: correct_answer for img_no, correct_answer in zip(images, answers)}
+    for _, v in df.iterrows():
+        if checklist[v.image] == int(v.answer):
+            worker_score[v.labeler] += 1
+    return [(float(worker_score[worked_by] / len(df) * 100), worked_by) for worked_by in worker_score.keys()]
 
 class ImageAI:
-    def save_img(self, project_no: int, DataBundle: object, Labeling_Dones: list) -> None:
-        import time
-        from urllib.request import urlretrieve
-        from urllib.parse import quote
+    def save_img(self, project_no: int, DataBundle: object, Labeling_Dones: list) -> list:
         path = f'{folder}/{project_no}'
         if not os.path.exists(path):
             os.makedirs(path)
@@ -35,17 +36,12 @@ class ImageAI:
                 if os.path.exists(filepath):
                     continue
                 urlretrieve(url, filepath)
-                time.sleep(0.5)
         except Exception as e:
             print(e)
         return array
                 
     def convert_to_num(self, project_no: int, DataBundle: object) -> list:
-        import glob
         files = glob.glob(f'{folder}/{project_no}/*.{DataBundle.bundle_data_type}')
-
-        from PIL import Image
-        import numpy as np
         photo_size = 32
         res = []
         for f in files:
@@ -57,13 +53,11 @@ class ImageAI:
         return res
 
     def color(self, project_no: int, array: list, convert_images_3D: list, labels: list):
-        import numpy as np
-        import pandas as pd
+        print('작업 시작')
         df = pd.DataFrame(array)
         df.rename(columns={0: 'image', 1: 'labeler', 2: 'answer'}, inplace=True)
         
         if len(convert_images_3D) < len(array):
-            from collections import Counter
             images = list(map(lambda x: x[0], array[:len(convert_images_3D)])) # 사진 갯수만큼 가져온 것
             answers = [Counter(list(df[df['image'] == str(i)]['answer'].astype('int32'))).most_common(1)[0][0] for i in images] # 통계로 voting에 가깝게 구현함
             # 답이, 사진 갯수보다 적을 때는, 라벨링이 덜 된 것이니 그냥 원본그대로 가면 되고
@@ -72,22 +66,17 @@ class ImageAI:
             images = list(df['image'])
             answers = list(df['answer'].astype('int32'))
 
-        insert_result(project_no, images, answers) # 정산하기 누르면 의뢰자에게 건네줄 데이터 db에 저장
-        # insert_trust([], []) # 조금 손 봐야 함
+        db.insert_result(project_no, images, answers) # 정산하기 누르면 의뢰자에게 건네줄 데이터 db에 저장
         
         # 이미지, 답
-        from sklearn.model_selection import train_test_split
         X_train, X_test, y_train, y_test = train_test_split(convert_images_3D, answers, test_size=0.2, random_state=0) # 원본의 타입이 유지됨
 
         X_train = np.array(X_train).astype('float32') / 255
         X_test = np.array(X_test).astype('float32') / 255
 
-        import tensorflow as tf
-        from keras.utils import to_categorical
         y_train = to_categorical(y_train, len(labels))
         y_test = to_categorical(y_test, len(labels))
 
-        from keras.layers import Dense
         model = tf.keras.Sequential([
         tf.keras.layers.Conv2D(32, kernel_size=(3, 3), padding='same', input_shape=(32, 32, 3), activation='relu'),
         tf.keras.layers.MaxPooling2D(pool_size=(2, 2)),
@@ -115,12 +104,7 @@ class ImageAI:
                 if res > 0:
                     print(f'실제결과 : {labels[j]}')
                     predicts['실제결과'].append(labels[j])
-        return predicts
-    
-        
 
-    def get_accuracy(self, correct: list, submitted: list) -> list:
-        res = []
-        for _ in range(len(submitted)):
-            res.append(sum([1 for a, b in zip(correct, submitted) if a == b]) / len(correct))
-        return res
+        db.update_trust(calc_accuracy(df, images, answers)) # [(신뢰도, 작업자), ...]를 넣어줌 
+
+        return predicts
