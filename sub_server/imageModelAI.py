@@ -1,6 +1,6 @@
-from oracleDB import oracleDB
-from dotenv import load_dotenv
 import os, time, glob
+from dotenv import load_dotenv
+from oracleDB import oracleDB
 from urllib.request import urlretrieve
 from urllib.parse import quote
 from PIL import Image
@@ -23,7 +23,7 @@ def calc_accuracy(df: list, images: list, answers: list) -> list:
     return [(float(worker_score[worked_by] / len(df) * 100), worked_by) for worked_by in worker_score.keys()]
 
 class ImageAI:
-    def save_img(self, project_no: int, DataBundle: object, Labeling_Dones: list) -> list:
+    async def save_img(self, project_no: int, DataBundle: object, Labeling_Dones: list) -> list:
         path = f'{folder}/{project_no}'
         if not os.path.exists(path):
             os.makedirs(path)
@@ -41,7 +41,7 @@ class ImageAI:
             print(e)
         return (array, originals)
                 
-    def convert_to_num(self, project_no: int, DataBundle: object) -> list:
+    async def convert_to_num(self, project_no: int, DataBundle: object) -> list:
         files = glob.glob(f'{folder}/{project_no}/*.{DataBundle.bundle_data_type}')
         photo_size = 32
         res = []
@@ -53,7 +53,7 @@ class ImageAI:
             res.append(img) # 그걸 모아서, 학습에 사용할 것
         return res
 
-    def color(self, project_no: int, array: list, originals: list, convert_images_3D: list, labels: list):
+    def color(self, project_no: int, array: list, originals: list, convert_images_3D: list, labels: list) -> None:
         print('작업 시작')
         df = pd.DataFrame(array)
         df.rename(columns={0: 'image', 1: 'labeler', 2: 'answer'}, inplace=True)
@@ -107,6 +107,4 @@ class ImageAI:
                     print(f'실제결과 : {labels[j]}')
                     predicts['실제결과'].append(labels[j])
 
-        db.update_trust(calc_accuracy(df, images, answers)) # [(신뢰도, 작업자), ...]를 넣어줌 
-
-        return predicts
+        db.update_trust(calc_accuracy(df, images, answers)) # [(신뢰도, 작업자), ...]를 넣어줌
